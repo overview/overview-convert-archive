@@ -22,9 +22,16 @@ Developing
 `./dev` will connect to the `overviewserver_default` network and run with
 `POLL_URL=http://overview-web:9032/Archive`.
 
-`./test` will run tests by spinning up a fake HTTP server.
+`./run-tests` will run tests by spinning up a fake HTTP server.
 
-`src/stream-archive.cc` is in C++. That's because we rely on
+Design decisions
+----------------
+
+`src/archive-to-multipart.c` is in C. That's because we rely on
 [libarchive](https://github.com/libarchive/libarchive) to do the extraction, and
 the wrappers around it don't inspire confidence. (The Python wrapper in
-particular includes comments about how memory may not be freed.)
+particular includes comments that memory may not be freed.)
+
+`archive-to-multipart` output is deterministic and it's a single file. That
+makes testing easy. It also lets us error out correctly on invalid input: we
+can read the error message from stderr.

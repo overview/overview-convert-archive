@@ -54,7 +54,6 @@ print_file_end(FILE* f)
 void
 print_epilogue(FILE* f, const char* boundary)
 {
-	print_file_end(f);
 	print_boundary(f, boundary);
 	easywrite(f, "--");
 }
@@ -234,6 +233,10 @@ print_archive_contents(FILE* f, const char* filename, const char* json_template,
 		fprintf(stderr, "Error closing %s: %s\n", filename, archive_error_string(a));
 		exit(1);
 	}
+
+	print_file_start(f, boundary, "done");
+	print_file_end(f);
+	print_epilogue(f, boundary);
 }
 
 int
