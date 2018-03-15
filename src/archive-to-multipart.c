@@ -232,6 +232,11 @@ print_archive_contents(int fd, const char* filename, const char* json_template, 
 	size_t n_bytes_total = filename_to_n_bytes(filename);
 
 	while (ARCHIVE_OK == archive_read_next_header(a, &entry)) {
+		if (0 == strcmp(".", archive_entry_pathname(entry))) {
+			// ISO-9660 archives can contain "." root path
+			continue;
+		}
+
 		print_archive_entry(
 			fd,
 			index_in_parent,

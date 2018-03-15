@@ -5,5 +5,5 @@ docker run \
          --rm \
          --network overviewserver_default \
          -e 'POLL_URL=http://overview-web:9032/Archive' \
-         $(docker build --target=dev -q .) \
+         $(docker build --target=test -q .) \
          "$@"

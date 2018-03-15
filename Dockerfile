@@ -40,8 +40,8 @@ FROM base AS dev
 
 FROM base AS test
 WORKDIR /app
-COPY /test/ /app/
-CMD [ "./test" ]
+COPY /test/ /app/test/
+CMD [ "test/all-tests.py" ]
 
 
 FROM base AS production
