@@ -38,10 +38,13 @@ CMD [ "./run" ]
 FROM base AS dev
 
 
+# The "test" image is special: we integration-test on Docker Hub by actually
+# _running_ the tests as part of the build.
 FROM base AS test
 WORKDIR /app
 COPY /test/ /app/test/
-CMD [ "test/all-tests.py" ]
+RUN ./test/all-tests.py
+CMD [ "true" ]
 
 
 FROM base AS production
