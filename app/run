@@ -1,0 +1,164 @@
+#!/usr/bin/python3
+
+import contextlib
+import json
+import os
+import random
+import requests
+import requests.exceptions
+import string
+import subprocess
+import sys
+import time
+
+
+http_session = requests.Session()
+
+
+def log(s):
+    sys.stderr.write(s + '\n')
+    sys.stderr.flush()
+
+
+class ConvertError(Exception):
+    def __init__(self, message):
+        Exception.__init__(self)
+        self.message = str(message)
+
+
+@contextlib.contextmanager
+def convert(input_filename, child_json_template, mime_boundary):
+    args = (
+        './archive-to-multipart',
+        input_filename,
+        child_json_template,
+        mime_boundary
+    )
+
+    with subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    ) as process:
+        err = b''
+        try:
+            yield process.stdout  # assume the block reads the entire contents
+        finally:
+            (_out, err) = process.communicate()
+        if process.returncode != 0:
+            log("Process exited with status code %d: %r" % (
+                process.returncode, err
+            ))
+            raise ConvertError(err)
+
+
+def http_post_or_none(url, *args, **kwargs):
+    try:
+        return http_session.post(url, *args, **kwargs)
+    except requests.exceptions.ConnectionError as err:
+        log("POST to %s failed with ConnectionError: %s" % (url, str(err)))
+        return None
+    except requests.exceptions.Timeout as err:
+        log("POST to %s failed with Timeout: %s" % (url, err.strerror))
+        return None
+
+
+def create_task(poll_url):
+    r = http_post_or_none(poll_url)
+    if r is None:
+        time.sleep(1)
+        return None
+    elif r.status_code == 201:
+        return r.json()
+    elif r.status_code == 204:
+        return None
+    else:
+        log("Unexpected response from %s: %d: %s" % (
+            poll_url, r.status_code, r.text
+        ))
+        time.sleep(1)
+        return None
+
+
+def download_to_scratchfile(blob_url, scratchfile):
+    scratchfile.seek(0)
+    scratchfile.truncate()
+    r = requests.get(blob_url, stream=True)
+    for chunk in r.iter_content(chunk_size=102400):
+        scratchfile.write(chunk)
+    scratchfile.flush()
+
+
+def generate_random_mime_boundary():
+    return ''.join(random.choices(
+        string.ascii_uppercase + string.ascii_lowercase + string.digits,
+        k=30
+    ))
+
+
+# Runs ./archive-to-multipart and POSTs its output to task_url as a multipart
+# message.
+def run_convert(input_filename, child_json_template, task_url):
+    mime_boundary = generate_random_mime_boundary()
+
+    headers = {
+        'Content-Type': 'multipart/form-data; boundary=' + mime_boundary
+    }
+
+    try:
+        with convert(
+            input_filename,
+            child_json_template,
+            mime_boundary
+        ) as data:
+            # Overview's server has a 1m max-chunk-size as of 2018-03-15. So
+            # we need to chunk our POST.
+            def chunk_data(bytesio):
+                last_n_read = -1
+                while last_n_read != 0:
+                    chunk = bytesio.read(512 * 1024)
+                    last_n_read = len(chunk)
+                    if last_n_read > 0:
+                        yield chunk
+
+            http_post_or_none(task_url, headers=headers, data=chunk_data(data))
+            # We don't care if the POST isn't successful: we're done either way
+    except ConvertError as err:
+        requests.post(task_url + '/error', data=err.message)
+
+
+def maybe_convert_once(poll_url, scratchfile, scratchfile_name):
+    task = create_task(poll_url)
+    if task is None:
+        return
+
+    log("Converting task %s (%s)..." % (
+        task['id'], task['filename']
+    ))
+
+    download_to_scratchfile(task['blob']['url'], scratchfile)
+
+    child_pipeline_options = dict(task['pipelineOptions'])
+    child_pipeline_options['stepsRemaining'] = []
+    child_json_template = json.dumps({
+        'filename': task['filename'] + '/FILENAME',
+        'contentType': 'application/octet-stream',
+        'languageCode': task['languageCode'],
+        'metadata': task['metadata'],
+        'pipelineOptions': child_pipeline_options
+    })
+
+    run_convert(scratchfile_name, child_json_template, task['url'])
+
+
+def main():
+    poll_url = os.environ['POLL_URL']
+    scratchfile_name = 'scratch.blob'
+
+    with open(scratchfile_name, 'wb+') as scratchfile:
+        while True:
+            maybe_convert_once(poll_url, scratchfile, scratchfile_name)
+
+
+if __name__ == '__main__':
+    main()

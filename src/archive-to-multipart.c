@@ -7,15 +7,6 @@
 const static size_t ARR_SIZE = 20; // for tiny buffers
 
 void
-perr(int is_error)
-{
-	if (is_error) {
-		perror("Error");
-		exit(1);
-	}
-}
-
-void
 perrmsg(int is_error, const char* message)
 {
 	if (is_error) {
@@ -25,37 +16,52 @@ perrmsg(int is_error, const char* message)
 }
 
 void
-easywrite(FILE* f, const char* message) {
-	perr(!fwrite(message, 1, strlen(message), f));
+easywrite_len(int fd, const void* buf, size_t len)
+{
+	while (len > 0) {
+		size_t n = write(fd, buf, len);
+		if (n == -1) {
+			perror("Error writing multipart data");
+			exit(1);
+		}
+		buf += n;
+		len -= n;
+	}
 }
 
 void
-print_boundary(FILE* f, const char* boundary)
+easywrite(int fd, const char* message)
 {
-	easywrite(f, "--");
-	easywrite(f, boundary);
+	easywrite_len(fd, message, strlen(message));
 }
 
 void
-print_file_start(FILE* f, const char* boundary, const char* filename)
+print_boundary(int fd, const char* boundary)
 {
-	print_boundary(f, boundary);
-	easywrite(f, "Content-Disposition: form-data; name=\"");
-	easywrite(f, filename);
-	easywrite(f, "\"\r\n");
+	easywrite(fd, "--");
+	easywrite(fd, boundary);
 }
 
 void
-print_file_end(FILE* f)
+print_file_start(int fd, const char* boundary, const char* filename)
 {
-	easywrite(f, "\r\n");
+	print_boundary(fd, boundary);
+	easywrite(fd, "\r\nContent-Disposition: form-data; name=\"");
+	easywrite(fd, filename);
+	easywrite(fd, "\"\r\n\r\n");
 }
 
 void
-print_epilogue(FILE* f, const char* boundary)
+print_file_end(int fd)
 {
-	print_boundary(f, boundary);
-	easywrite(f, "--");
+	easywrite(fd, "\r\n");
+}
+
+void
+print_epilogue(int fd, const char* boundary)
+{
+	print_boundary(fd, boundary);
+	easywrite(fd, "--");
 }
 
 /**
@@ -114,7 +120,7 @@ json_escape(const char* s)
 }
 
 void
-print_archive_entry_json(FILE* f, const char* json_template, const char* filename)
+print_archive_entry_json(int fd, const char* json_template, const char* filename)
 {
 	// JSON, with "FILENAME" replaced by the actual filename
 	const char* json_filename_pos = strstr(json_template, "FILENAME\"");
@@ -134,26 +140,26 @@ print_archive_entry_json(FILE* f, const char* json_template, const char* filenam
 		json_filename_pos + 8,
 		strlen(json_filename_pos + 8)
 	);
-	easywrite(f, json);
+	easywrite(fd, json);
 	free(json);
 	free(json_filename);
 }
 
 void
-print_archive_entry(FILE* f, int index_in_parent, const char* json_template, const char* boundary, struct archive* archive, struct archive_entry* entry)
+print_archive_entry(int fd, int index_in_parent, const char* json_template, const char* boundary, struct archive* archive, struct archive_entry* entry)
 {
 	char arr[ARR_SIZE];
 
 	// "0.json": metadata
 	snprintf(&arr[0], ARR_SIZE, "%d.json", index_in_parent);
-	print_file_start(f, boundary, &arr[0]);
+	print_file_start(fd, boundary, &arr[0]);
 	const char* filename = archive_entry_pathname(entry);
-	print_archive_entry_json(f, json_template, filename);
-	print_file_end(f);
+	print_archive_entry_json(fd, json_template, filename);
+	print_file_end(fd);
 
 	// "0.blob": contents
 	snprintf(&arr[0], ARR_SIZE, "%d.blob", index_in_parent);
-	print_file_start(f, boundary, &arr[0]);
+	print_file_start(fd, boundary, &arr[0]);
 	for (;;) {
 		const void* buf;
 		size_t len;
@@ -166,26 +172,26 @@ print_archive_entry(FILE* f, int index_in_parent, const char* json_template, con
 			exit(1);
 		}
 
-		perrmsg(len != fwrite(buf + offset, 1, len, f), "Error writing extracted contents");
+		easywrite_len(fd, buf/* + offset*/, len);
 	}
-	print_file_end(f);
+	print_file_end(fd);
 }
 
 void
-print_progress(FILE* f, const char* boundary, size_t n_bytes_processed, size_t n_bytes_total)
+print_progress(int fd, const char* boundary, size_t n_bytes_processed, size_t n_bytes_total)
 {
 	char arr[ARR_SIZE];
 
 	// "progress"
-	print_file_start(f, boundary, "progress");
-	easywrite(f, "{\"bytes\":{\"nProcessed\":\"");
-	snprintf(arr, ARR_SIZE, "%d", n_bytes_processed);
-	easywrite(f, arr);
-	easywrite(f, "\",\"nTotal\":\"");
-	snprintf(arr, ARR_SIZE, "%d", n_bytes_total);
-	easywrite(f, arr);
-	easywrite(f, "\"}}");
-	print_file_end(f);
+	print_file_start(fd, boundary, "progress");
+	easywrite(fd, "{\"bytes\":{\"nProcessed\":");
+	snprintf(arr, ARR_SIZE, "%zu", n_bytes_processed);
+	easywrite(fd, arr);
+	easywrite(fd, ",\"nTotal\":");
+	snprintf(arr, ARR_SIZE, "%zu", n_bytes_total);
+	easywrite(fd, arr);
+	easywrite(fd, "}}");
+	print_file_end(fd);
 }
 
 size_t
@@ -197,7 +203,7 @@ filename_to_n_bytes(const char* filename)
 }
 
 void
-print_archive_contents(FILE* f, const char* filename, const char* json_template, const char* boundary)
+print_archive_contents(int fd, const char* filename, const char* json_template, const char* boundary)
 {
 	struct archive* a;
 	struct archive_entry* entry;
@@ -216,7 +222,7 @@ print_archive_contents(FILE* f, const char* filename, const char* json_template,
 
 	while (ARCHIVE_OK == archive_read_next_header(a, &entry)) {
 		print_archive_entry(
-			f,
+			fd,
 			index_in_parent,
 			json_template,
 			boundary,
@@ -224,7 +230,7 @@ print_archive_contents(FILE* f, const char* filename, const char* json_template,
 			entry
 		);
 
-		print_progress(f, boundary, n_bytes_total, archive_filter_bytes(a, -1));
+		print_progress(fd, boundary, n_bytes_total, archive_filter_bytes(a, -1));
 
 		index_in_parent += 1;
 	}
@@ -234,9 +240,9 @@ print_archive_contents(FILE* f, const char* filename, const char* json_template,
 		exit(1);
 	}
 
-	print_file_start(f, boundary, "done");
-	print_file_end(f);
-	print_epilogue(f, boundary);
+	print_file_start(fd, boundary, "done");
+	print_file_end(fd);
+	print_epilogue(fd, boundary);
 }
 
 int
@@ -251,5 +257,5 @@ main(int argc, char** argv)
 	const char* json_template = argv[2];
 	const char* boundary = argv[3];
 
-	print_archive_contents(stdout, filename, json_template, boundary);
+	print_archive_contents(fileno(stdout), filename, json_template, boundary);
 }
