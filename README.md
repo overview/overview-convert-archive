@@ -38,3 +38,13 @@ makes testing easy.
 `archive-to-multipart` should _never_ exit with nonzero status code. That would
 _always_ be an error in the code. Invalid input should produce a valid error
 message.
+
+`test/all-tests.py` runs within the Dockerfile. That's to make Docker Hub an
+integration-test framework.
+
+
+License
+-------
+
+This software is Copyright 2011-2018 Jonathan Stray, and distributed under the
+terms of the GNU Affero General Public License. See the LICENSE file for details.
