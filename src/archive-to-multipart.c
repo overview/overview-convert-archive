@@ -64,6 +64,16 @@ print_epilogue(int fd, const char* boundary)
 	easywrite(fd, "--");
 }
 
+void
+print_error_and_exit(int fd, const char* boundary, const char* message)
+{
+	print_file_start(fd, boundary, "error");
+	easywrite(fd, message);
+	print_file_end(fd);
+	print_epilogue(fd, boundary);
+	exit(0); // SUCCESS: we successfully detected an error in the file
+}
+
 /**
  * Returns s, with unsafe characters escaped.
  *
@@ -169,7 +179,8 @@ print_archive_entry(int fd, int index_in_parent, const char* json_template, cons
 		if (r == ARCHIVE_EOF) break;
 		if (r != ARCHIVE_OK) {
 			fprintf(stderr, "Error reading from archive: %s\n", archive_error_string(archive));
-			exit(1);
+			print_file_end(fd);
+			print_error_and_exit(fd, boundary, archive_error_string(archive));
 		}
 
 		easywrite_len(fd, buf/* + offset*/, len);
@@ -215,7 +226,7 @@ print_archive_contents(int fd, const char* filename, const char* json_template, 
 
 	if (ARCHIVE_OK != archive_read_open_filename(a, filename, 10240)) {
 		fprintf(stderr, "Error opening %s: %s\n", filename, archive_error_string(a));
-		exit(1);
+		print_error_and_exit(fd, boundary, archive_error_string(a));
 	}
 
 	size_t n_bytes_total = filename_to_n_bytes(filename);
@@ -237,7 +248,7 @@ print_archive_contents(int fd, const char* filename, const char* json_template, 
 
 	if (ARCHIVE_OK != archive_read_free(a)) {
 		fprintf(stderr, "Error closing %s: %s\n", filename, archive_error_string(a));
-		exit(1);
+		print_error_and_exit(fd, boundary, archive_error_string(a));
 	}
 
 	print_file_start(fd, boundary, "done");

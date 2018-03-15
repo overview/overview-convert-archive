@@ -33,5 +33,8 @@ the wrappers around it don't inspire confidence. (The Python wrapper in
 particular includes comments that memory may not be freed.)
 
 `archive-to-multipart` output is deterministic and it's a single file. That
-makes testing easy. It also lets us error out correctly on invalid input: we
-can read the error message from stderr.
+makes testing easy.
+
+`archive-to-multipart` should _never_ exit with nonzero status code. That would
+_always_ be an error in the code. Invalid input should produce a valid error
+message.
