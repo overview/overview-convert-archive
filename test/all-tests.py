@@ -4,6 +4,7 @@ import email
 import pathlib
 import subprocess
 import unittest
+import sys
 
 
 class ConvertError(Exception):
@@ -102,4 +103,6 @@ def suite():
 
 if __name__ == '__main__':
     runner = unittest.TextTestRunner()
-    runner.run(suite())
+    result = runner.run(suite())
+    if not result.wasSuccessful():
+        sys.exit(1)
