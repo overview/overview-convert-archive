@@ -14,7 +14,7 @@ Usage
 
 In an Overview cluster, you'll want to use the Docker container:
 
-`docker run -e POLL_URL=http://worker-url:9032/Archive overview/overview-convert-archive:1.0.0`
+`docker run -e POLL_URL=http://worker-url:9032/Archive overview/overview-convert-archive:2.0.0`
 
 Developing
 ==========
