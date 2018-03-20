@@ -20,7 +20,7 @@ Developing
 ==========
 
 `./dev` will connect to the `overviewserver_default` network and run with
-`POLL_URL=http://overview-web:9032/Archive`.
+`POLL_URL=http://overview-worker:9032/Archive`.
 
 `./run-tests` will run tests by spinning up a fake HTTP server.
 
