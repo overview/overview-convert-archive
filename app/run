@@ -139,14 +139,13 @@ def maybe_convert_once(poll_url, scratchfile, scratchfile_name):
 
     download_to_scratchfile(task['blob']['url'], scratchfile)
 
-    child_pipeline_options = dict(task['pipelineOptions'])
-    child_pipeline_options['stepsRemaining'] = []
     child_json_template = json.dumps({
         'filename': task['filename'] + '/FILENAME',
         'contentType': 'application/octet-stream',
         'languageCode': task['languageCode'],
         'metadata': task['metadata'],
-        'pipelineOptions': child_pipeline_options
+        'wantOcr': task['wantOcr'],
+        'wantSplitByPage': task['wantSplitByPage']
     })
 
     run_convert(scratchfile_name, child_json_template, task['url'])
