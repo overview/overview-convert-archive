@@ -4,15 +4,15 @@ import contextlib
 import json
 import os
 import random
-import requests
-import requests.exceptions
 import string
 import subprocess
 import sys
 import time
+import urllib3
+import urllib3.exceptions
 
 
-http_session = requests.Session()
+http_pool = urllib3.PoolManager()
 
 
 def log(s):
@@ -54,29 +54,30 @@ def convert(input_filename, child_json_template, mime_boundary):
 
 def http_post_or_none(url, *args, **kwargs):
     try:
-        return http_session.post(url, *args, **kwargs)
-    except requests.exceptions.ConnectionError as err:
-        log("POST to %s failed with ConnectionError: %s" % (url, str(err)))
+        return http_pool.request('POST', url, *args, retries=False, **kwargs)
+    except urllib3.exceptions.NewConnectionError as err:
+        message = str(err).split(': ')[-1]
+        log("POST %s failed: %s" % (url, message))
         return None
-    except requests.exceptions.Timeout as err:
-        log("POST to %s failed with Timeout: %s" % (url, err.strerror))
+    except urllib3.exceptions.ProtocolError as err:
+        log("POST %s failed: %s" % (url, str(err.args[1])))
         return None
 
 
 def create_task(poll_url):
     r = http_post_or_none(poll_url)
     if r is None:
-        time.sleep(1)
+        time.sleep(5)
         return None
-    elif r.status_code == 201:
-        return r.json()
-    elif r.status_code == 204:
+    elif r.status == 201:
+        return json.loads(r.data.decode('utf-8'))
+    elif r.status == 204:
         return None
     else:
         log("Unexpected response from %s: %d: %s" % (
-            poll_url, r.status_code, r.text
+            poll_url, r.status, r.data.decode('utf-8')
         ))
-        time.sleep(1)
+        time.sleep(5)
         return None
 
 

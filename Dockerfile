@@ -27,7 +27,7 @@ RUN make
 
 
 FROM alpine:3.7 AS base
-RUN apk add --update --no-cache python3 py3-requests 
+RUN apk add --update --no-cache python3 py3-urllib3 
 
 WORKDIR /app
 COPY app/ /app/
