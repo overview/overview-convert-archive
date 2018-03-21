@@ -170,20 +170,11 @@ print_archive_entry(int fd, int index_in_parent, const char* json_template, cons
 	// "0.blob": contents
 	snprintf(&arr[0], ARR_SIZE, "%d.blob", index_in_parent);
 	print_file_start(fd, boundary, &arr[0]);
-	for (;;) {
-		const void* buf;
-		size_t len;
-		la_int64_t offset;
-
-		int r = archive_read_data_block(archive, &buf, &len, &offset);
-		if (r == ARCHIVE_EOF) break;
-		if (r != ARCHIVE_OK) {
-			fprintf(stderr, "Error reading from archive: %s\n", archive_error_string(archive));
-			print_file_end(fd);
-			print_error_and_exit(fd, boundary, archive_error_string(archive));
-		}
-
-		easywrite_len(fd, buf/* + offset*/, len);
+	int r = archive_read_data_into_fd(archive, fd);
+	if (r != ARCHIVE_OK) {
+		fprintf(stderr, "Error reading from archive: %s\n", archive_error_string(archive));
+		print_file_end(fd);
+		print_error_and_exit(fd, boundary, archive_error_string(archive));
 	}
 	print_file_end(fd);
 }
