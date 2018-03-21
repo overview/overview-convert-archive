@@ -84,9 +84,10 @@ def create_task(poll_url):
 def download_to_scratchfile(blob_url, scratchfile):
     scratchfile.seek(0)
     scratchfile.truncate()
-    r = requests.get(blob_url, stream=True)
-    for chunk in r.iter_content(chunk_size=102400):
+    r = http_pool.request('GET', blob_url, preload_content=False)
+    for chunk in r.stream(102400):
         scratchfile.write(chunk)
+    r.release_conn()
     scratchfile.flush()
 
 
@@ -122,7 +123,7 @@ def run_convert(input_filename, child_json_template, task_url):
                     if last_n_read > 0:
                         yield chunk
 
-            http_post_or_none(task_url, headers=headers, data=chunk_data(data))
+            http_post_or_none(task_url, headers=headers, body=chunk_data(data))
             # We don't care if the POST isn't successful: we're done either way
     except ConvertError as err:
         requests.post(task_url + '/error', data=err.message)
