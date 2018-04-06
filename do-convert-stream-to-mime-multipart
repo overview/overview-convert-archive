@@ -1,0 +1,10 @@
+#!/bin/bash
+
+MIME_BOUNDARY="$1"
+JSON_TEMPLATE=$(echo "$2" | jq '{ filename: (.filename + "/FILENAME"), languageCode: .languageCode, wantOcr: .wantOcr, wantSplitByPage: .wantSplitByPage, contentType: "application/octet-stream", metadata: .metadata }')
+
+# Save input to file: 7zip dictionaries are at the end of the file so we can't
+# stream them
+cat > input.blob
+
+exec /app/archive-to-multipart input.blob "$JSON_TEMPLATE" "$MIME_BOUNDARY"

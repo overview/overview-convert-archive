@@ -4,17 +4,15 @@ It extracts the contents of archives.
 What it does
 ============
 
-1. Downloads a task from Overview's task handler
-2. Streams the zipfile from the task blob URL, extracts the stream, and sends
-   extracted files and progress events in one big multipart/form-data POST to
-   Overview.
+1. Writes stdin to input.blob in the CWD
+2. Extracts it, streaming output as multipart/form-data on stdout
 
 Usage
 =====
 
 In an Overview cluster, you'll want to use the Docker container:
 
-`docker run -e POLL_URL=http://worker-url:9032/Archive overview/overview-convert-archive:2.0.0`
+`docker run -e POLL_URL=http://worker-url:9032/Archive overview/overview-convert-archive:2.1.0`
 
 Developing
 ==========
@@ -35,13 +33,8 @@ particular includes comments that memory may not be freed.)
 `archive-to-multipart` output is deterministic and it's a single file. That
 makes testing easy.
 
-`archive-to-multipart` should _never_ exit with nonzero status code. That would
-_always_ be an error in the code. Invalid input should produce a valid error
-message.
-
 `test/all-tests.py` runs within the Dockerfile. That's to make Docker Hub an
 integration-test framework.
-
 
 License
 -------

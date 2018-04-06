@@ -22,17 +22,21 @@ RUN apk add --update --no-cache \
 WORKDIR /build/overview-convert-archive
 COPY Makefile Makefile
 COPY src/ src/
-
 RUN make
 
 
+FROM overview/overview-convert-framework:0.0.10 as framework
+
+
 FROM alpine:3.7 AS base
-RUN apk add --update --no-cache python3 py3-urllib3 
+RUN apk add --update --no-cache jq
 
 WORKDIR /app
-COPY app/ /app/
+COPY --from=framework /app/run /app/
+COPY --from=framework /app/convert-stream-to-mime-multipart /app/convert
 COPY --from=build /build/overview-convert-archive/archive-to-multipart /app/
-CMD [ "./run" ]
+COPY do-convert-stream-to-mime-multipart /app/
+CMD [ "/app/run" ]
 
 
 FROM base AS dev
@@ -41,7 +45,7 @@ FROM base AS dev
 # The "test" image is special: we integration-test on Docker Hub by actually
 # _running_ the tests as part of the build.
 FROM base AS test
-WORKDIR /app
+RUN apk add --update --no-cache python3
 COPY /test/ /app/test/
 RUN ./test/all-tests.py
 CMD [ "true" ]
