@@ -237,7 +237,7 @@ print_archive_contents(int fd, const char* filename, const char* json_template, 
 			entry
 		);
 
-		print_progress(fd, boundary, n_bytes_total, archive_filter_bytes(a, -1));
+		print_progress(fd, boundary, archive_filter_bytes(a, -1), n_bytes_total);
 
 		index_in_parent += 1;
 	}
