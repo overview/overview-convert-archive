@@ -29,7 +29,7 @@ FROM overview/overview-convert-framework:0.0.10 as framework
 
 
 FROM alpine:3.7 AS base
-RUN apk add --update --no-cache jq
+RUN apk add --update --no-cache ca-certificates jq
 
 WORKDIR /app
 COPY --from=framework /app/run /app/
