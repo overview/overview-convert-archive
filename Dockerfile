@@ -1,7 +1,17 @@
+FROM overview/overview-convert-framework:0.0.15 as framework
+
+
+FROM alpine:3.7 AS os
+RUN apk add --update --no-cache jq
+
+
+FROM alpine:3.7 AS test-base
+RUN apk add --update --no-cache jq python3
+WORKDIR /app
+
+
 FROM alpine:3.7 AS build
-
 ENV LIBARCHIVE_VERSION 3.3.2
-
 RUN apk add --update --no-cache \
       build-base \
       curl \
@@ -18,19 +28,13 @@ RUN apk add --update --no-cache \
   && cd libarchive-${LIBARCHIVE_VERSION} \
   && ./configure --without-xml2 \
   && make -j3
-
 WORKDIR /build/overview-convert-archive
 COPY Makefile Makefile
 COPY src/ src/
 RUN make
 
 
-FROM overview/overview-convert-framework:0.0.10 as framework
-
-
-FROM alpine:3.7 AS base
-RUN apk add --update --no-cache ca-certificates jq
-
+FROM os AS base
 WORKDIR /app
 COPY --from=framework /app/run /app/
 COPY --from=framework /app/convert-stream-to-mime-multipart /app/convert
@@ -44,8 +48,10 @@ FROM base AS dev
 
 # The "test" image is special: we integration-test on Docker Hub by actually
 # _running_ the tests as part of the build.
-FROM base AS test
-RUN apk add --update --no-cache python3
+FROM test-base AS test
+COPY --from=framework /app/convert-stream-to-mime-multipart /app/convert
+COPY --from=build /build/overview-convert-archive/archive-to-multipart /app/
+COPY do-convert-stream-to-mime-multipart /app/
 COPY /test/ /app/test/
 RUN ./test/all-tests.py
 CMD [ "true" ]
