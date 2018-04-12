@@ -201,7 +201,7 @@ filename_to_n_bytes(const char* filename)
 {
 	struct stat statbuf;
 	perrmsg(stat(filename, &statbuf), "Error determining input file size");
-
+	return statbuf.st_size;
 }
 
 void
