@@ -2,7 +2,7 @@ FROM overview/overview-convert-framework:0.0.15 as framework
 
 
 FROM alpine:3.7 AS os
-RUN apk add --update --no-cache jq
+RUN apk add --update --no-cache jq ca-certificates
 
 
 FROM alpine:3.7 AS test-base
