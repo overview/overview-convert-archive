@@ -223,23 +223,30 @@ print_archive_contents(int fd, const char* filename, const char* json_template, 
 	size_t n_bytes_total = filename_to_n_bytes(filename);
 
 	while (ARCHIVE_OK == archive_read_next_header(a, &entry)) {
-		if (0 == strcmp(".", archive_entry_pathname(entry))) {
-			// ISO-9660 archives can contain "." root path
-			continue;
+		switch (archive_entry_filetype(entry)) {
+		case AE_IFREG:
+			print_archive_entry(
+				fd,
+				index_in_parent,
+				json_template,
+				boundary,
+				a,
+				entry
+			);
+
+			print_progress(fd, boundary, archive_filter_bytes(a, -1), n_bytes_total);
+
+			index_in_parent += 1;
+			break;
+		case AE_IFLNK:  // symlink or hardlink: no data to extract
+		case AE_IFSOCK: // socket: no data to extract
+		case AE_IFCHR:  // special file: no data to extract
+		case AE_IFBLK:  // block device: no data to extract
+		case AE_IFDIR:  // directory: not a document (we'll see its contents later)
+		case AE_IFIFO:  // pipe: no data to extract
+		default:
+			break;
 		}
-
-		print_archive_entry(
-			fd,
-			index_in_parent,
-			json_template,
-			boundary,
-			a,
-			entry
-		);
-
-		print_progress(fd, boundary, archive_filter_bytes(a, -1), n_bytes_total);
-
-		index_in_parent += 1;
 	}
 
 	if (ARCHIVE_OK != archive_read_free(a)) {
